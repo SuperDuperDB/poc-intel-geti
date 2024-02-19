@@ -25,7 +25,7 @@ def qa(query, vector_search_top_k=5):
     )
     if sources:
         sources = sorted(sources, key=lambda x: x.content["score"], reverse=True)
-    return output, sources
+    return output.content, sources
 
 
 def process_sources(sources):
