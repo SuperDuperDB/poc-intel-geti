@@ -1,0 +1,7 @@
+unstructured
+pandas
+superduperdb
+openai
+aiohttp
+fastapi
+uvicorn
