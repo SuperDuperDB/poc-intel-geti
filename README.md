@@ -4,9 +4,9 @@
 
 - python>3.10
 - mongodb `127.0.0.1:27017` (Hard code...)
-## Build
+## Build DB
 
-run the `build.ipynb`
+Run the `build.ipynb`
 
 ## Steamlit App
 `streamlit run app.py`
