@@ -32,7 +32,10 @@ def process_sources(sources):
             Collection("pages").find_one({"_id": source_data}).execute(db)["url"]
         )
         data = source.outputs("elements", "chunk")
-        url = source_url + data["url"]
+        if data['url'].startswith("http"):
+            url = data["url"]
+        else:
+            url = source_url + data["url"]
         yield {
             "score": source["score"],
             "url": url,
