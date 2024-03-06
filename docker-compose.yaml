@@ -1,0 +1,131 @@
+version: "3.9"
+
+name: rag
+
+services:
+
+  # ------------------------------
+  # MongoDB Datastore ------------------------------
+  mongodb:
+    image: mongo:6
+    hostname: mongodb
+    ports:
+      - "27017:27017"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mongod --replSet rs0 --port 27017 --bind_ip 0.0.0.0 --dbpath /data/db/ --logpath /dev/null
+
+  mongo-init:
+    image: mongo:6
+    depends_on:
+      - mongodb
+    volumes:
+      - ./deploy/mongo-init.sh:/scripts/mongo-init.sh
+    env_file: deploy/users.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /scripts/mongo-init.sh
+
+  # Vector Search Service
+  # ------------------------------
+  vector-search:
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    hostname: vector-search
+    ports:
+      - "8000:8000"
+    env_file: deploy/users.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        python -m superduperdb vector-search
+    healthcheck:
+      test: curl http://localhost:8000/health || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  # Change Data Capture Service
+  # ------------------------------
+  cdc:
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    hostname: cdc
+    ports:
+      - "8001:8001"
+    env_file: deploy/users.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        python -m superduperdb cdc
+    healthcheck:
+      test: curl http://localhost:8001/health || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  #  Demo SuperDuperDB Notebooks
+  #  ------------------------------
+  jupyterlab:
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    hostname: jupyterlab
+    ports:
+      - "8888:8888" # HTTP Notebooks
+    env_file: deploy/users.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        jupyter lab --port=8888 --no-browser --ip=0.0.0.0 --NotebookApp.token='' --allow-root
+    healthcheck:
+      test: curl http://localhost:8888 || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  #  Streamlit App
+  #  ------------------------------
+  streamlit:
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    hostname: streamlit
+    ports:
+      - "8501:8501" # HTTP Notebooks
+    env_file: deploy/users.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        streamlit run app.py
+    healthcheck:
+      test: curl http://localhost:8888 || exit 1
+      interval: 40s
+      timeout: 30s
+      retries: 10
+      start_period: 60s

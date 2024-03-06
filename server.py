@@ -1,13 +1,14 @@
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from superduperdb import Document, superduper
-from superduperdb.backends.mongodb import Collection
-from superduperdb import logging
 
-# It just super dupers your database
-db = superduper("mongodb://127.0.0.1:27017/intel-geti")
+from superduperdb import Document, logging, superduper
+from superduperdb.backends.mongodb import Collection
+
+mongodb_uri = os.getenv("SUPERDUPERDB_DATA_BACKEND","mongomock://test")
+db = superduper(mongodb_uri)
 
 
 def qa(query, vector_search_top_k=5):

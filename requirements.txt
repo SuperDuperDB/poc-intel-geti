@@ -1,8 +1,8 @@
 unstructured
 pandas
-superduperdb
 openai
 aiohttp
 fastapi
 uvicorn
 streamlit
+git+https://github.com/jieguangzhou/superduperdb.git@feat/cdc-rag#egg=superduperdb
