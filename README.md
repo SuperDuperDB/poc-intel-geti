@@ -1,15 +1,28 @@
 # poc-geti
+## Step1: 
 
-## Env
+Add the OPENAI KEY in deploy/users.env
 
-- python>3.10
-- mongodb `127.0.0.1:27017` (Hard code...)
-## Build DB
+```
+OPENAI_API_KEY: "xxxxx"
+```
 
-Run the `build.ipynb`
 
-## Steamlit App
-`streamlit run app.py`
+Start docker-compose
 
-## Fastapi
-`uvicorn server:app --host 0.0.0.0 --port 18000`
+```
+docker compose -f docker-compose.yaml up -d
+```
+
+## Step2:
+
+Open https://localhost:8888
+
+
+login notebook and run `build.ipynb`
+
+
+## Step3:
+
+Open https://localhost:8501
+
