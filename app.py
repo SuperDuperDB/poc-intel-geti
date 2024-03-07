@@ -8,8 +8,10 @@ from superduperdb import Document, logging, superduper
 from superduperdb.backends.mongodb import Collection
 
 # It just super dupers your database
-mongodb_uri = os.getenv("SUPERDUPERDB_DATA_BACKEND", "mongomock://test")
-db = superduper(mongodb_uri)
+def init_db():
+    mongodb_uri = os.getenv("SUPERDUPERDB_DATA_BACKEND", "mongomock://test")
+    db = superduper(mongodb_uri)
+    return db
 
 
 def qa(query, vector_search_top_k=5):
@@ -48,10 +50,10 @@ st.set_page_config(page_title="SuperDuperDB - Documents Chatbot")
 st.header("SuperDuperDB - Documents Chatbot")
 
 
+db = st.cache_resource(init_db)()
 
 def add_new_data(url):
-    urls = [url]
-    yield f"Added {len(urls)} new URLs to the database"
+    yield f"Added {url} to the database"
     data = Document(**{"url": url})
     db.execute(Collection("url").insert_one(data), refresh=False)
     

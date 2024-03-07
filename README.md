@@ -24,5 +24,11 @@ login notebook and run `build.ipynb`
 
 ## Step3:
 
+**Streamlit APP**
+
 Open https://localhost:8501
 
+
+**FastAPI**
+
+Open https://localhost:18000/docs

@@ -5,18 +5,20 @@ from io import StringIO
 from urllib.parse import urljoin
 
 import pandas as pd
+from pydantic import main
 import requests
 from bs4 import BeautifulSoup
-from superduperdb import Listener, Model, VectorIndex, superduper
+from superduperdb import Listener, Model, VectorIndex, logging, superduper
 from superduperdb.backends.mongodb import Collection
 from superduperdb.base.datalayer import Datalayer
 from superduperdb.base.document import Document
 from superduperdb.components.model import SequentialModel
 from superduperdb.ext.openai import OpenAIEmbedding
+from superduperdb.misc.retry import Retry
 from unstructured.documents.elements import ElementType
 from unstructured.partition.html import partition_html
 
-mongodb_uri = os.getenv("SUPERDUPERDB_DATA_BACKEND","mongomock://test")
+mongodb_uri = os.getenv("SUPERDUPERDB_DATA_BACKEND", "mongomock://test")
 db = superduper(mongodb_uri)
 
 
@@ -58,8 +60,15 @@ def process_py_class(source_html):
 
 
 def parse_url(seed_url):
+    retry = Retry(exception_types=(Exception))
+
+    @retry
+    def get_response(url):
+        response = requests.get(seed_url)
+        return response
+
     print(f"parse {seed_url}")
-    response = requests.get(seed_url)
+    response = get_response(seed_url)
     # Parse the HTML content
     source_html = response.text
     source_html = process_code_snippets(source_html)
@@ -69,14 +78,17 @@ def parse_url(seed_url):
 
 
 def url2html(url):
-    return parse_url(url)
+    try:
+        html = parse_url(url)
+    except Exception as e:
+        logging.error(e)
+        html = ""
+    return html
 
 
 def page2elements(page):
     elements = partition_html(text=page, html_assemble_articles=True)
     return elements
-
-
 
 
 def get_title_data(element):
@@ -99,7 +111,6 @@ def get_title_data(element):
         return data
     category_depth = element.metadata.category_depth
     return {"link": link_urls[0], "category_depth": category_depth}
-
 
 
 def element2text(element):
@@ -141,8 +152,6 @@ def get_chunk_texts(text, chunk_size=1000, overlap_size=300):
             break
 
     return chunks
-
-
 
 
 def get_chunks(elements):
@@ -216,7 +225,7 @@ def add_model_chunk(db, url_listener):
     chunk_listener = Listener(
         model=chunk_model,
         select=Collection("_outputs.url.url2html").find(),
-        key=f'_outputs.url.url2html.{url_listener.model.version}',
+        key=f"_outputs.url.url2html.{url_listener.model.version}",
     )
 
     db.add(chunk_listener)
@@ -240,7 +249,7 @@ def add_model_embedding(db, chunk_listener):
     )
     embed_listener = Listener(
         select=Collection("_outputs.url.chunk").find(),
-        key=f'_outputs.url.chunk.{chunk_listener.model.version}',  # Key for the documents
+        key=f"_outputs.url.chunk.{chunk_listener.model.version}",  # Key for the documents
         model=embed_model,  # Specify the model for processing
         predict_kwargs={"max_chunk_size": 64},
     )
@@ -252,13 +261,15 @@ def add_model_embedding(db, chunk_listener):
 def add_vector_index(db, embed_listener):
     vector_index = VectorIndex(
         identifier="vector_index",
-        indexing_listener=embed_listener,)
+        indexing_listener=embed_listener,
+    )
     db.add(vector_index)
     print(vector_index.identifier)
 
 
 def add_model_llm(db):
     from superduperdb.ext.openai import OpenAIChatCompletion
+
     prompt = """
     As an Intel GETI assistant, based on the provided documents and the question, answer the question.
     If the document does not provide an answer, offer a safe response without fabricating an answer.
@@ -268,11 +279,11 @@ def add_model_llm(db):
 
     Question: """
 
-    llm = OpenAIChatCompletion(identifier='gpt-3.5-turbo', prompt=prompt)
+    llm = OpenAIChatCompletion(identifier="gpt-3.5-turbo", prompt=prompt)
 
     db.add(llm)
 
-    print(db.show('model'))
+    print(db.show("model"))
 
 
 def setup():
@@ -287,7 +298,9 @@ def setup():
 def vector_search(query):
     outs = db.execute(
         Collection("_outputs.url.chunk")
-        .like(Document({"_outputs.url.chunk.0": query}), vector_index="vector_index", n=3)
+        .like(
+            Document({"_outputs.url.chunk.0": query}), vector_index="vector_index", n=3
+        )
         .find()
     )
     if outs:
@@ -327,3 +340,7 @@ def qa(query, vector_search_top_k=5):
 def insert_url(url):
     datas = Document(**{"url": url})
     db.execute(Collection("url").insert_one(datas), refresh=False)
+
+
+if __name__ == "__main__":
+    setup()
